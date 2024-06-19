@@ -1,5 +1,10 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
-
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+//import * as open from 'open';
+import open from 'open';
+import axios from 'axios';
 // Remember to rename these classes and interfaces!
 
 interface MyPluginSettings {
@@ -13,8 +18,196 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
 
+	
+	
+
 	async onload() {
+		
 		await this.loadSettings();
+		let gptfilePath: string;
+		const homeDir = os.homedir();
+		let crntYear: number = new Date().getFullYear();
+		let crntMonth: number = new Date().getMonth() + 1;
+		
+		//const filePath1 = path.join(homeDir, 'Documents/2024/summer_intern/Obsidian-cligpt');
+		const filePath1 = path.join(homeDir, `Documents/GPT-Logs/${crntYear}/2024-${crntMonth}`);
+		if (!fs.existsSync(filePath1)) {
+			// If it doesn't exist, create it
+			fs.mkdirSync(filePath1, {recursive: true});
+		}
+		//const filePath1 = path.join(homeDir, `Documents/2024/summer_intern/Obsidian-cligpt`);
+		function generateTimestampedFileName(): string { //generates the filename based on timestamp
+			const timestamp = new Date().toISOString();
+			return `cligpt-${timestamp}.md`;
+		}
+		function createAndWriteToFile(directory: string): string {//creates file using generated timestamp, and writes our info into file
+			const fileName = generateTimestampedFileName();
+			const filePath = path.join(directory, fileName);
+			const message = "role: You are an expert Software Developer\nmodel: gpt-4\n## Question:\n---------\n"
+		
+			try {
+				fs.writeFileSync(filePath, message, { flag: 'a' });
+				new Notice(`File created and content written: ${fileName}`);
+				//vscode.window.showInformationMessage(`File created and content written: ${fileName}`);
+			} catch (error) {
+				new Notice('Failed to create and write to the file');
+				//vscode.window.showErrorMessage('Failed to create and write to the file');
+			}
+			//return fileName;
+			return filePath;
+		}
+		// async function openFileInVSCode(filePath: string) {
+		// 	let fileToOpen = app.vault.getAbstractFileByPath(filePath);
+		// 	if(fileToOpen) {
+		// 		app.workspace.activeLeaf?.open(fileToOpen);
+		// 		let newLeaf = app.workspace.splitActiveLeaf(); 
+    	// 		newLeaf.open(fileToOpen);
+		// 	// Open the file in a new leaf
+		// 		//app.workspace.openLeafInNewWindow(fileToOpen);
+		// 	}
+		// }
+
+		async function sendToChatGPT(content: string): Promise<string | null> {
+			//return content;
+			const apiKey = 'REPLACE WITH API KEY';//process.env.OPENAI_API_KEY; 
+			let auth: string = 'Bearer ' + apiKey;
+			// const api_key = process.env.OPENAI_APIKEY;
+			// vscode.window.showInformationMessage(api_key);
+			try {
+				const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+					model: 'gpt-4', // Specify the correct model
+					messages: [{"role": "user", "content": content}],
+					max_tokens: 1000
+				}, 
+				{
+					headers: {
+						'Authorization': auth,
+						'Content-Type': 'application/json'
+					}
+				});
+				if (response.data && response.data.choices && response.data.choices.length > 0) {
+					//return response.request.choices[0].message.content;
+					let final:string = response.data.choices[0].message.content;//.data.choices[0].text;//.data.choices[0].text.trim();
+					return final;
+				}
+				else{
+					new Notice('something bad');
+				}
+			}
+			catch (error) {
+				if (axios.isAxiosError(error)) {
+					new Notice('Error response:', error.response?.data);
+					console.error('Error response:', error.response?.data);
+				}
+				else {
+					console.error('Unexpected error:', error);
+					new Notice('unexpected error:', error);
+				}
+				throw error;
+			}
+			return null;
+		}
+
+		//
+		this.addRibbonIcon('dog', 'cligpt', () => {
+			gptfilePath = createAndWriteToFile(filePath1);
+			//openFileInObsidian(gptfilePath);
+		});
+		this.addCommand({
+			id: 'send-to-gpt',
+			name: 'send to gpt',
+			editorCallback: async () => {
+				new Notice('running gpt');
+				let activeLeaf = app.workspace.activeLeaf;
+
+				if (activeLeaf) {
+					let view = activeLeaf.view
+					if (view instanceof MarkdownView) {
+						//if(!gptfilePath){
+						let activeFile = view.file;
+						//new Notice(gptfilePath);
+						if (activeFile) {
+							// basename gives you the filename (with extension)
+							gptfilePath = path.join(filePath1, activeFile.basename) + ".md";
+							//console.log(fileName);
+							//new Notice(gptfilePath);
+						}
+						else{
+							new Notice("FAIL");
+						}
+						//
+						//}
+						let editor = view.editor
+						let doc = editor.getDoc()
+						let fileContent = doc.getValue() // This is the text content of your current file
+						const response = await sendToChatGPT(fileContent);
+						if(response){
+							fs.writeFileSync(gptfilePath, `\n\n## ChatGPT Response:\n---------\n${response}\n\n## My question:\n---------\n`, { flag: 'a' });
+						}
+						else{
+							new Notice('no response');
+						}
+					}
+					else{
+						new Notice('instance of markdown fail');
+					}
+				}
+				else{
+					new Notice('app or activeLeaf is deprecated');
+				}
+			}
+		});
+		this.addCommand({
+			id: 'commit-to-gpt',
+			name: 'commit to gpt',
+			editorCallback: async () => {
+				let activeLeaf = app.workspace.activeLeaf;
+
+				if (activeLeaf) {
+					let view = activeLeaf.view
+					if (view instanceof MarkdownView) {
+						//if(!gptfilePath){
+						let activeFile = view.file;
+						//new Notice(gptfilePath);
+						if (activeFile) {
+							// basename gives you the filename (with extension)
+							gptfilePath = path.join(filePath1, activeFile.basename) + ".md";
+							//console.log(fileName);
+							//new Notice(gptfilePath);
+						}
+						else{
+							new Notice("FAIL");
+						}
+						//
+						//}
+						let editor = view.editor
+						let doc = editor.getDoc()
+						const lineCount = editor.lineCount();
+						
+						let fileContent = doc.getValue() // This is the text content of your current file
+						const summary = await sendToChatGPT(fileContent + "give me a 1 sentence summary of this conversation, I want you to make it as short a sentence as possible while still encapsolating the conversation. No more than 25 words but ideally less, and it doesnt have to be a pretty complete sentence as long as I can understand the gist");
+						if(summary){
+							if(lineCount > 3) {
+								// Delete last three lines
+								editor.replaceRange("\n## Summary:\n---------\n", {line: lineCount - 4, ch: 0}, {line: lineCount, ch: 0});
+							}
+							
+							fs.writeFileSync(gptfilePath, summary, { flag: 'a' });
+						}
+						else{
+							new Notice('no response');
+						}
+					}
+					else{
+						new Notice('instance of markdown fail');
+					}
+				}
+				else{
+					new Notice('app or activeLeaf is deprecated');
+				}
+			}
+		})
+
 
 		// This creates an icon in the left ribbon.
 		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
