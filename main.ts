@@ -2,9 +2,8 @@ import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Set
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-//import * as open from 'open';
-import open from 'open';
 import axios from 'axios';
+import { config } from 'config';
 // Remember to rename these classes and interfaces!
 
 interface MyPluginSettings {
@@ -28,13 +27,29 @@ export default class MyPlugin extends Plugin {
 		const homeDir = os.homedir();
 		let crntYear: number = new Date().getFullYear();
 		let crntMonth: number = new Date().getMonth() + 1;
-		
-		//const filePath1 = path.join(homeDir, 'Documents/2024/summer_intern/Obsidian-cligpt');
-		const filePath1 = path.join(homeDir, `Documents/GPT-Logs/${crntYear}/2024-${crntMonth}`);
+		//Will be trying to implemet a folder system to store gpt logs
+		const crntFilePath = process.cwd();
+		//new Notice(crntFilePath);
+		//const filePath1 = path.join(crntFilePath, `GPT-Logs/${crntYear}/2024-${crntMonth}`)
+		// if (!fs.existsSync(crntFilePath)) {
+		// 	// If it doesn't exist, create it
+		// 	fs.mkdirSync(crntFilePath, {recursive: true});
+		// }
+		const vault_name = this.app.vault.adapter.getName();
+		//new Notice(fpth);
+		const filePath1 = path.join(homeDir, `Documents/2024/summer_intern/${vault_name}`);
+		//const filePath1 = path.join(homeDir, `Documents/GPT-Logs/${crntYear}/2024-${crntMonth}`);
 		if (!fs.existsSync(filePath1)) {
 			// If it doesn't exist, create it
 			fs.mkdirSync(filePath1, {recursive: true});
 		}
+		const filePath2 = path.join(filePath1,`GPT-Logs/${crntYear}/2024-${crntMonth}` )
+		if (!fs.existsSync(filePath2)) {
+			// If it doesn't exist, create it
+			//this.app.vault.adapter.mkdir(`${crntYear}`);
+			fs.mkdirSync(filePath2, {recursive: true});
+		}
+		
 		//const filePath1 = path.join(homeDir, `Documents/2024/summer_intern/Obsidian-cligpt`);
 		function generateTimestampedFileName(): string { //generates the filename based on timestamp
 			const timestamp = new Date().toISOString();
@@ -69,13 +84,31 @@ export default class MyPlugin extends Plugin {
 
 		async function sendToChatGPT(content: string): Promise<string | null> {
 			//return content;
-			const apiKey = 'REPLACE WITH API KEY';//process.env.OPENAI_API_KEY; 
+			const apiKey: string = config.apiKey;
+			const model: string = config.model;
+			//dotenv.config();
+			//const apiKey: string | undefined = process.env.API_KEY;
+			if(apiKey){
+				new Notice(apiKey);
+			}
+			else{
+				new Notice("undefined apikey");
+			}
+			
+			//const model: string | undefined = process.env.MODEL;
+			if(model){
+				new Notice(model);
+			}
+			else{
+				new Notice("undefined model");
+			}
+			//const apiKey = 'REPLACE WITH API KEY';//process.env.OPENAI_API_KEY; 
 			let auth: string = 'Bearer ' + apiKey;
 			// const api_key = process.env.OPENAI_APIKEY;
 			// vscode.window.showInformationMessage(api_key);
 			try {
 				const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-					model: 'gpt-4', // Specify the correct model
+					model: model, // Specify the correct model
 					messages: [{"role": "user", "content": content}],
 					max_tokens: 1000
 				}, 
@@ -110,7 +143,7 @@ export default class MyPlugin extends Plugin {
 
 		//
 		this.addRibbonIcon('dog', 'cligpt', () => {
-			gptfilePath = createAndWriteToFile(filePath1);
+			gptfilePath = createAndWriteToFile(filePath2);
 			//openFileInObsidian(gptfilePath);
 		});
 		this.addCommand({
@@ -128,7 +161,7 @@ export default class MyPlugin extends Plugin {
 						//new Notice(gptfilePath);
 						if (activeFile) {
 							// basename gives you the filename (with extension)
-							gptfilePath = path.join(filePath1, activeFile.basename) + ".md";
+							gptfilePath = path.join(filePath2, activeFile.basename) + ".md";
 							//console.log(fileName);
 							//new Notice(gptfilePath);
 						}
@@ -171,7 +204,7 @@ export default class MyPlugin extends Plugin {
 						//new Notice(gptfilePath);
 						if (activeFile) {
 							// basename gives you the filename (with extension)
-							gptfilePath = path.join(filePath1, activeFile.basename) + ".md";
+							gptfilePath = path.join(filePath2, activeFile.basename) + ".md";
 							//console.log(fileName);
 							//new Notice(gptfilePath);
 						}
