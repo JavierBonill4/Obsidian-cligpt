@@ -168,7 +168,7 @@ export default class MyPlugin extends Plugin {
 						const lineCount = editor.lineCount();
 						
 						let fileContent = doc.getValue() // This is the text content of your current file
-						const summary = await sendToChatGPT(fileContent + "give me a 1 sentence summary of this conversation, I want you to make it as short a sentence as possible while still encapsolating the conversation. No more than 25 words but ideally less, and it doesnt have to be a pretty complete sentence as long as I can understand the gist");
+						const summary = await sendToChatGPT(fileContent + "give me a 1 sentence summary of this conversation, I want you to make it as short a sentence as possible while still encapsolating the conversation. No more than 25 words but ideally less, and it doesnt have to be a pretty, complete sentence as long as I can understand the gist. Don't include me asking you to summarize this conversation as part of your summary of this conversation");
 						if(summary){
 							if(lineCount > 3) {
 								// Delete last three lines
